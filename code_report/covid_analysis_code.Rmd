@@ -1,0 +1,274 @@
+---
+title: "Trabajo final"
+author: "Carlos Zelada"
+date: "14/11/2021"
+output:
+  prettydoc::html_pretty:
+    theme: caiman
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r,include=FALSE}
+#install.packages("gganimate")
+#install.packages("rworldmap")
+#install.packages("rgdal")
+#install.packages('rgeos')
+#install.packages('countrycode')
+library(prettydoc)
+rm(list = ls())
+setwd("C:/Users/Carlos/Documents/Carlos Zelada/Diplomado en data science para las política públicas y sociales/Fundamentos de R para CCSS y la gestión pública/Trabajo final")
+```
+
+```{r, message=FALSE,warning = FALSE}
+# Libreía usadas
+
+library(rio)# importar las bases de datos
+library(dplyr) # usar el pipe 
+library(tidyverse) # usar el pipe
+library(lubridate) # dar formato a las fechas
+library(knitr) # dar formato a las tablas en html con la función kable
+library(rmarkdown)  # usar un diseño de html
+library(rmdformats)
+library(ggplot2) # para realizar gráficas
+library(scales) # para formato grafico de data temporal
+library(gganimate) # para realizar gráficos animados
+library(cowplot)
+library(sf)
+library(rworldmap)
+library(rgdal)
+library(rgeos)
+library(countrycode)
+library(devtools)
+library(viridis)
+library(zoo)
+library(gifski)
+library(transformr)
+library(gtools)
+```
+
+```{r, message=FALSE,warning = FALSE}
+# Bases de datos
+
+url_our_world_covid = "https://covid.ourworldindata.org/data/owid-covid-data.csv"
+base_covid = import(url_our_world_covid)
+
+horizonte = Sys.Date() - as.Date("01/01/2020","%d/%m/%Y")
+
+horizonte_covid = data_frame(periodo = seq(0:horizonte), id = 1)
+horizonte_covid$date = as.Date("01/01/2020","%d/%m/%Y") + horizonte_covid$periodo - 1
+horizonte_covid$date = as.character(horizonte_covid$date) 
+
+base_covid_pais = filter(base_covid, continent != "")
+base_covid_pais$date = as.character(base_covid_pais$date) 
+
+base_paises = data.frame(iso_code = unique(base_covid_pais$iso_code))
+base_paises$id = 1
+horizonte_covid = full_join(base_paises,horizonte_covid, by = "id")
+base_covid_pais = left_join(horizonte_covid,base_covid_pais, by =c("date","iso_code"))
+
+base_covid_pais$date = as.Date(base_covid_pais$date,"%Y-%m-%d") 
+```
+
+
+## Determinantes macro del impacto de la Covid-19 a nivel mundial
+
+### 1. Introducción
+
+La pandemia por covid-19, identificada por primera vez en China en el año 2019, ha evidenciado una serie de brechas importantes en diversos países, especialmente en lo que se refiere a aspectos económicos, sociales y sanitarios. La rápida propagación de la enfermedad hacia diferentes territorios, y la severidad de la misma han significado un importante reto para todos los sistemas de salud a nivel mundial, los cuales han experimentado una constante presión a lo largo del año 2020 y parte del 2021, por el elevado número de casos que requerían hospitalizaciones.
+
+Ante esta prerrogativa, en los últimos dos años, los Gobiernos han adoptado diversas medidas para contener la propagación del virus, y de esta manera, dar un respiro a sus saturados sistemas de salud, con la finalidad de reducir la mortalidad de la enfermedad. Entre estas estrategias resaltan las medidas de distanciamiento social, como las restricciones de aforo, uso de mascarillas y faciales, entre otros; medidas de inmovilización social, como las cuarentenas totales y focalizadas; y medidas de prevención, como los testeos masivos, detección y aislamiento temprano, vacunación, entre otros.
+
+Cada país ha adoptado un conjunto de estrategias cuya aplicación y severidad se ha dado de manera heterogénea, en concordancia con la dinámica propia que ha presentado la pandemia en cada territorio, lo que ha contribuido a generar  resultados diversos que, en algunos casos, fueron muchos más exitoso que otros. El mayor impacto se evidenció principalmente en las tasas de mortalidad por covid-19, pues esta indicador suele presentar menores errores de medición debido a la existencia de registros de información de defunciones más sofisticados, en comparación con otras variables como los casos positivos u pruebas de descarte.    
+
+La proliferación de nuevas variantes de la covid-19 ha supuesto un gran desafío para los Gobiernos, puesto que estas han evidenciado ser cada vez más contagiosas en comparación a la variante nativa. En este escenario, la estrategia de vacunación se ha consolidado como la medida universal más importante para la lucha contra la pandemia. Esta estrategia se ha venido implementado de manera paulatina en diversos países desde comienzos del año 2021, ello debido a la excesiva demanda y la insuficiente capacidad productiva de los principales laboratorios.
+
+### 2. Pregunta de Investigación e hipotesis
+
+Ante este contexto, el presente trabajo busca responder la pregunta siguiente pregunta: ¿Cuales han sido los determinantes que habrían contribuido a que algunos paises hayan podido gestionar mejor la pandemia en comparación a otros?. Para responder a esta pregunta una de las principales hipótesis es el principal determinante  esta se relacionado a aspectos estructurales, es decir, a los niveles de desarrollo alcanzados por los paises.
+
+En linea con esta hipótesis principal, se desprende que, los paises con mejores condiciones de desarrollo económico y social hanbrian tenido un mejor resultado con la aplicación de sus medidas de confinamiento y contención de la pandemia, en contraste con  otros paises que no contaban con altos estándares de desarrollo en ámbitos sociales como la salud, educación; economía; tecnologia; y buenas condiciones de empleo.
+
+Finalmente, una segunda hipotesis secundaria se relaciona a la eficacia de la vacunación masiva como herramienta universal para reducir los impactos de la covid-19, la cual habrá tenido un impacto positivo, es especial en los últimos meses; no obstante su potencialidad podria verse mermado por el relajamiento de las medidas sanitarias y la dificultad de avanzar de manera equitativa en la cobertura universal de la población. 
+
+
+### 3. Análisis descriptivo
+
+Como se observa en la figura 1, la pandemia por covid-19 ha tenido sus primeros impactos en terminos de mortalidad en la ciudad de Whuham, en China, lugar donde se detecto por primera vez la el virus Sars-Cov-2. No obstante, el virus se expandió rapidamente en los siguientes meses a diferentes paises, incluso fuera del continente asiático, lo que llevó a la Organización Mundial de la Salud a declararlo el estado de pandemia, aunque en un periodo en el que el virus ya se encontraba generando grandes estragos los paises europeos como Italia y España.
+
+De hecho los primeros reportes de alta mortalidad por covid-19 provinieron principalmente de los paises con altos niveles de desarrollo, los cuales vieron sus sistemas de salud llegar al límite e inclusive colapsar por semanas.Este hecho llevó a que diferentes paises empezaran a tomar medidas fuertes para evitar la propagación del virus en sus territorios, en especial aquellos que no contaban con un sistema de salud lo suficientemente bueno para hacer frente a una ola de hospitalizaciones.
+
+A pesar de ello, ya para el segundo trimenstre del año 2020 el virus llegó a latinoamerica, donde poco a poco se fue transformando en el nuevo foco de la pandemia, inciando en Brasil, pero alcanzando su mayor impacto en el Perú. Esto generó toda una controversia a nivel mundial debido a que el Perú el país que aplicó una de las cuarentenas más estrictas en los primeros meses del año 2020; sin embargo los resultados fueron completamente contrarios a los esperados según evidencia la información de la mortalidad mensual. Este escenario se repitió durante la segunda ola de contagios a inicios del año 2021.  
+
+
+```{r,dev='png', interval=0.4, message=FALSE,warning = FALSE}
+
+# Mapa dinámico de distribución de nuevos casos 
+  
+  data_fallecidos = base_covid_pais
+  data_fallecidos$año=year(data_fallecidos$date)
+  data_fallecidos$mes=month(data_fallecidos$date)   
+  data_fallecidos$añomes<- as.factor(format(data_fallecidos$date,'%m/%Y')) 
+  
+  data_fallecidos = data_fallecidos %>%
+    group_by(iso_code,añomes) %>%
+    summarise(fallecidos_mes = sum(new_deaths),poblacion = mean(population)) 
+  data_fallecidos$date <- as.Date(as.yearmon(data_fallecidos$añomes,format = "%m/%Y"),format = "%m-%Y")
+  
+  horizonte_covid = data.frame(date = unique(data_fallecidos$date), id =1)
+  
+  data_fallecidos$mortalidad = data_fallecidos$fallecidos_mes/data_fallecidos$poblacion*1000000
+  data_fallecidos$mortalidad[data_fallecidos$mortalidad<0] = 0
+  vmax <- max(data_fallecidos$mortalidad, na.rm=T)
+  vmin <- min(data_fallecidos$mortalidad, na.rm=T)
+
+  wmap = getMap(resolution="low")
+  
+  wmap = spTransform(wmap, CRS("+proj=robin")) # reproject
+
+  wmap_df = fortify(wmap, region = "ISO3")
+  wmap_df$id_2 = 1
+  wmap_df = full_join(wmap_df,horizonte_covid, by = c("id_2" = "id"))
+  wmap_df$date = as.character(wmap_df$date) 
+  data_fallecidos$date = as.character(data_fallecidos$date) 
+  
+  wmap_df = left_join(wmap_df, data_fallecidos, by = c('id'='iso_code',"date")) 
+  wmap_df$date <- as.Date(as.yearmon(wmap_df$date,format = "%Y-%m-%d"),format = "%m-%Y")
+
+mapa_fallecidos = wmap_df %>%
+  ggplot() +  geom_polygon(aes(x = long, y = lat, group = group, fill=mortalidad), color="gray90")  + scale_fill_viridis(name="Fallecidos por millón de habitantes", begin = 1, end = 0, limits = c(vmin,vmax), na.value="gray99") +
+        theme_void() + guides(fill = guide_colorbar(title.position = "top")) +
+        labs(title = "Figura 1.Mortalidad mensual por covid-19, {frame_time}") +
+        labs(caption = "Elaboración propia\nFuente: Our world in data") +
+        theme(plot.title = element_text(hjust = 0.5, vjust = 0.05, size=25)) +
+        theme(plot.caption = element_text(hjust = 0, color="gray40", size=15)) +
+        coord_cartesian(xlim = c(-11807982, 14807978)) +
+        theme( legend.position = c(.5, .08), 
+               legend.direction = "horizontal", 
+               legend.title.align = 0,
+               legend.key.size = unit(0.9, "cm"),
+               legend.title=element_text(size=17), 
+               legend.text=element_text(size=13) ) + transition_time(date)
+
+
+animate(mapa_fallecidos, fps = 2, height = 574, width = 875)
+```
+
+En efecto, al revisar el ranking de los paises con mayor tasa de mortalidad de covid-19 por millón de habitantes en lo que va de la pandemia, el Perú se encuentra en en el puesto número 1 con un aproximado de 6 mil fallecidos por millón de habitantes, el doble del segundo lugar (Bulgaria) y de otros paises de latinoamérica como Brasil. Cabe mencionar que en el caso de Bulgaria, Bosnia, Macedonia, Montenegro y Hungría; son los paises donde la variante delta esta generando el mayor impacto en términos de mortalidad en los últimos meses.
+
+```{r, message=FALSE,warning = FALSE}
+# Tabla del ranking de los 10 paises con mayor mortalidad por covid-19
+
+tabla_paises_fallecidos_10top = base_covid_pais 
+tabla_paises_fallecidos_10top$total_deaths_per_million[is.na(tabla_paises_fallecidos_10top$total_deaths_per_million)] = 0
+tabla_paises_fallecidos_10top=tabla_paises_fallecidos_10top%>%
+  group_by(location)%>%
+  summarise(Numero_fallecidos = round(max(total_deaths_per_million),1))%>%
+  top_n(n = 10)
+
+tabla_paises_fallecidos_10top = tabla_paises_fallecidos_10top[order(tabla_paises_fallecidos_10top$Numero_fallecidos, decreasing = TRUE),] 
+
+kable(tabla_paises_fallecidos_10top, format.args = list(big.mark = ","), col.names = c("País", "Fallecidos por millón de hab") ,caption = "Paises con mayor mortalidad por covid-19")
+
+```
+
+Es importante señalar que, si bien las medidas para la contención de la pandemia son fundamentales para reducir el impacto de la misma sobre la población, la eficacia de estas estrategias podrían depender de otros factores relacionados a aspectos estructurales de los prospios sistemas de Gobierno y las condiciones iniciales de desarrollo con las que cuenta cada país. Sin embargo, como se muestra en figura 2, existe una relación positiva entre niveles de ingresos (medidos por el PBI percápita) y mortalidad por covid-19. Esto evidenciaría que, incluso estadísticamente serían los paises de mayores ingresos los que registraron un mayor impacto en sus territorios en términos de mortalidad.
+
+De la misma manera, se evidencia una relación positiva entre la mortalidad por covid-19 y los niveles de desarrollo, medidos por el Indice de desarrollo Humano (IDH). Esto genera una paradoja respecto a nuestra hispotesis inicial, lo que indicaría que el impacto de la pandemia en términos de mortalidad no estaría puramente asociada a factores estructurales, sino tambien a factores coyunturales. 
+
+```{r, message=FALSE,warning = FALSE}
+# Relación entre Mortalidad por covid-19, PBI e IDH
+
+mortalidad_pbi_idh = base_covid_pais
+mortalidad_pbi_idh[is.na(mortalidad_pbi_idh)] = 0
+mortalidad_pbi_idh = mortalidad_pbi_idh %>%
+  group_by(location) %>% 
+  summarise(mortalidad = max(total_deaths_per_million), pbi_pc = max(gdp_per_capita), idh = max(human_development_index))
+
+
+mortalidad_pbi = ggplot(mortalidad_pbi_idh, aes(x = log(mortalidad), y = log(pbi_pc))) + geom_point() + stat_smooth(method = "lm", col = "#C42126", se = FALSE, size = 1) + labs(y="Log(PBI percápita)",x="Log(mortalidad por covid-19)")
+mortalidad_idh = ggplot(mortalidad_pbi_idh, aes(x = log(mortalidad), y = idh)) + geom_point() + stat_smooth(method = "lm", col = "#C42126", se = FALSE, size = 1) + labs(y="Indice de Desarrollo Humano",x="Log(mortalidad por covid-19)")
+
+grap_comb = plot_grid(mortalidad_pbi, mortalidad_idh)
+
+title <- ggdraw() + draw_label("Figura 2. Relación entre mortalidad por covid-19, PBI percápita e IDH",
+    fontface = 'bold', x = 0, hjust = 0) + theme(plot.margin = margin(0, 0, 0, 7))
+
+plot_grid(title, grap_comb, ncol = 1, rel_heights = c(0.1, 1))
+
+```
+
+En este aspecto, los factores coyunturales de la pandemia han sido contestadas por la mayoría de Gobiernos a traves de medidas de restricción sanitarias como el distanciamiento social y las cuarentenas. Como se muestra en la figura 3, al principio de la pandemia mas del 80% de los paises aplciaron medidas consideradas como muy estrictas, entre las que resaltan las cuarentenas totales o focalizadas.No obstante, como se mencionó en un principio, en el caso de Latinoamérica, principalmente en Perú, los resultados de estas medidas fueron contrarias a las esperadas, inclusive en comparación con otros paises de la región como Brasil, el cual no ha aplicado medidas tan restrictivas.
+
+Sin embargo, se evidencia que desde finales del año 2020, en plena segunda ola de contagios en muchos paises, estos han optado por otro tipo de estrategias, entre ellos la vacunacion, motivo por el cual solo cerca del 35% de los paises volvieron a aplicar cuarentenas durantes las siguiente olas de contagio. Esto se da en el marco de la reactivación de actividades económicas, lo cual se vio seriamente afectada por las medidas de restricción que se impusieron en el inicio de la pandemia. 
+
+```{r, message=FALSE,warning = FALSE}
+
+# Evolución del indice de rigidez de las medidas de confinamiento
+
+  data_medidas = base_covid_pais
+  data_medidas$año=year(data_medidas$date)
+  data_medidas$mes=month(data_medidas$date)   
+  data_medidas$añomes<- as.factor(format(data_medidas$date,'%Y-%m'))
+  data_medidas$añomes<- as.Date(paste(data_medidas$añomes,"-01",sep=""))
+
+data_medidas = data_medidas %>%
+  group_by(añomes,iso_code) %>% 
+  summarise(stringency_index = mean(stringency_index))
+
+data_medidas$stringency_index=quantcut(data_medidas$stringency_index, q=3)
+
+data_medidas <- data_medidas[!is.na(data_medidas$stringency_index),]
+
+data_medidas%>% 
+  group_by(añomes,stringency_index) %>% 
+  summarise(num_paises = n())%>% 
+  group_by(añomes) %>% 
+  mutate(prop = round(num_paises/sum(num_paises)*100,1))%>%
+  ggplot(aes(x=añomes,y=num_paises,fill=stringency_index)) + geom_bar(stat = "identity") + scale_y_continuous()  + labs(title="Figura 3.Rigidez de las restricciones sanitarias por mes", y="Número de paises",x="Mes", caption = "Fuente de datos Our World in data. Actualizado al 14 de noviembre") + theme_bw() + 
+  scale_x_date(NULL, breaks = scales::breaks_width("1 months"),labels = scales::label_date_short()) + theme(legend.position = "bottom") +
+  scale_fill_manual(' Indice de rigidez de medidas sanitarias ',values = c("palegreen", "lightgoldenrod1","indianred1")) + 
+  geom_text(aes(label = prop, y = num_paises), vjust = 0.3,size = 3, 
+            position = position_stack(vjust = 0.5))
+```
+
+En este último aspecto, como se muestran en las figuras de 4 a la 6, las tendencias de los principales indicadores epidemiológicos muestran que las campañas masivas de vacunación iniciadas desde finales del 2020 ha tenido un impacto positivo en la reducción de los efectos adversos de la pandemia, en especial en lo que corresponde a la mortalidad. Como se puede evidenciar dado que la vacunación emperzó con mayor fuerza en los paises con mayor ingresos, las curvas de contagio y de fallecidos cayeron rapidamente en los primeros meses del año 2021; en el caso de los paises de ingresos medio, tanto la mortalidad como la incidencia de nuevos casos se incrementaron por encima de los picos registrados en las olas anteriores.  
+
+A partir del segundo semestre del 2021, la vacunación ha empezado a ser masiva en los paises de ingresos medios, lo que esta contribuyendo a reducir los contagios y muertes en los últimos meses. No obstante, es importante resaltar que a partir de este mismo periodo, el número de contagios y fallecidos se ha incrementado en los paises de altos ingresos, esto se relaciona a la proliferación de la variante delta, pero tambien al relajamiento extremo de las medidas sanitarias impuestas por los Gobiernos, tal como se observó en la figura 3.  
+
+```{r, message=FALSE,warning = FALSE}
+
+# Evolución de casos, mortalidad y vacunación por grupos de paises de ingresos
+
+data_epi_group = filter(base_covid,location == "Low income" | location == "Lower middle income" |
+                       location == "Upper middle income" | location == "High income")
+
+data_epi_group$location[data_epi_group$location == "Low income"] = "Ingresos bajos"
+data_epi_group$location[data_epi_group$location == "Lower middle income"] = "Ingresos medios bajos"
+data_epi_group$location[data_epi_group$location == "Upper middle income"] = "Ingresos medios altos"
+data_epi_group$location[data_epi_group$location == "High income"] = "Ingresos altos"
+data_epi_group$date = as.POSIXct(data_epi_group$date)
+data_epi_group = subset(data_epi_group, select = c(3,4,13,16,43))
+data_epi_group$people_fully_vaccinated_per_hundred = data_epi_group$people_fully_vaccinated_per_hundred
+   
+plot_casos = data_epi_group %>% ggplot(aes(x=date, y=new_cases_smoothed_per_million)) +  geom_line(aes(color = location),size=1) + labs(title=" Figura 4.Nuevos casos diarios por millón de hab", y="Número de casos por millón de hab",x="meses") + theme(axis.text.x = element_text(colour = 'black', size = 12, hjust = 0.5, vjust = 0.5),axis.title.x=element_blank()) +    theme(axis.text.y = element_text(colour = 'black', size = 10), axis.title.y = element_text(size = 10, hjust = 0.5, vjust = 0.2), title = element_text(size = 6))  + theme_bw() + theme(legend.position = "bottom")  + scale_y_continuous(labels = comma) 
+
+plot_fallecidos = data_epi_group %>% ggplot(aes(x=date, y=new_deaths_smoothed_per_million)) +  geom_line(aes(color = location),size=1) + labs(title="Figura 5.Fallecidos diarios por millón de hab", y="Número de fallecidos por millón de hab",x="meses") + theme(axis.text.x = element_text(colour = 'black', size = 12, hjust = 0.5, vjust = 0.5),axis.title.x=element_blank()) +    theme(axis.text.y = element_text(colour = 'black', size = 10), axis.title.y = element_text(size = 10, hjust = 0.5, vjust = 0.2), title = element_text(size = 6))  + theme_bw() + theme(legend.position = "bottom")  + scale_y_continuous(labels = comma) 
+
+plot_vacunas = data_epi_group %>% ggplot(aes(x=date, y=people_fully_vaccinated_per_hundred)) +  geom_line(aes(color = location),size=1) + labs(title="Figura 6.Porcentaje de personas completamente inmunizadas", y="Porcentaje de la población",x="meses") + theme(axis.text.x = element_text(colour = 'black', size = 12, hjust = 0.5, vjust = 0.5),axis.title.x=element_blank()) +    theme(axis.text.y = element_text(colour = 'black', size = 10), axis.title.y = element_text(size = 10, hjust = 0.5, vjust = 0.2), title = element_text(size = 6))  + theme_bw() + theme(legend.position = "bottom")  + scale_y_continuous(labels = comma) 
+
+plot_casos
+plot_fallecidos
+plot_vacunas
+   
+```
+
+
+### 4. Conlusiones
+
+Del analisis realizado se desprende que existen diversos factores que han influido de alguna manera en el desempeño de los Gobiernos para hacer frente a la pandemia, por lo que no se puede aseverar que esta se deba principalmente a causas estructurales, si no tambien los factores coyunturales juegan un rol fundamental. Por otra parte, las estrategias de confinamiento han evidenciado resultados mixtos; sin embargo son poco sostenibles en el tiempo, motivo por el cual los Gobiernos estan optando cada vez más en medidas menos restrictivas y en la vacunación masiva para poder reactivar sus actividades.
+
+Es vital señalar que la vacunación es por ahora la estrategia más importante para la lucha contra la pandemia; no obstante, no se debe dejar de lado otras medidas de distanciamiento que han evidenciado ser costo-efectivas como el uso de la mascarilla, las restricciones de aforo, entre otros. Solo la correcta combinación de políticas sanitarias y de reactivación económica ayudaran a los paises a salir de la crisis ocacionada por la covid-19.  
